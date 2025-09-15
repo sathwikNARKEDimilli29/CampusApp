@@ -37,6 +37,12 @@ Small, documented Python module and demo for managing campus events, student reg
 2. Start the API + frontend: `uvicorn server:app --reload`
 3. Open http://127.0.0.1:8000 in your browser
 
+## Run Tests
+
+1. Install dev deps: `pip install -r requirements.txt`
+2. Ensure `DB_BACKEND=memory` in `.env` (default)
+3. Run: `pytest -q`
+
 You should see event summaries, a conflict report, and service request counts printed to stdout.
 
 ## Environment Variables
