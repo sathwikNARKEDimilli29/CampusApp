@@ -18,7 +18,7 @@ from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 
 from campus_system import (
     CampusSystem,
@@ -80,12 +80,12 @@ class EventIn(BaseModel):
     venue: str
     max_seats: int = Field(ge=0)
 
-    @validator("date")
+    @field_validator("date")
     def _v_date(cls, v: str) -> str:
         parse_date(v)
         return v
 
-    @validator("start_time", "end_time")
+    @field_validator("start_time", "end_time")
     def _v_time(cls, v: str) -> str:
         parse_time(v)
         return v
