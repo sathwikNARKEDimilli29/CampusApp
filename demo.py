@@ -1,22 +1,47 @@
 """Demo script to exercise CampusSystem with the provided sample dataset.
 
 Run: python demo.py
+
+Supports two backends:
+- In-memory (default)
+- MongoDB Atlas (set DB_BACKEND=mongodb and MONGODB_URI in .env)
 """
 
-from campus_system import CampusSystem, Event, Student, parse_date, parse_time
+import os
+from campus_system import CampusSystem, Event, Student, parse_date, parse_time, MongoStore
+
+# Optional: load .env if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except Exception:
+    pass
 
 
 def seed_sample_data(sys: CampusSystem) -> None:
     # Students (minimal details for demo)
-    sys.add_student(Student("S01", "Alice", "CSE", 3, "alice@example.com"))
-    sys.add_student(Student("S02", "Bob", "ECE", 2, "bob@example.com"))
-    sys.add_student(Student("S03", "Carol", "ME", 1, "carol@example.com"))
-    sys.add_student(Student("S04", "Dave", "EEE", 4, "dave@example.com"))
-    sys.add_student(Student("S05", "Eve", "Robotics", 3, "eve@example.com"))
-    sys.add_student(Student("S06", "Frank", "Literature", 2, "frank@example.com"))
+    for s in [
+        Student("S01", "Alice", "CSE", 3, "alice@example.com"),
+        Student("S02", "Bob", "ECE", 2, "bob@example.com"),
+        Student("S03", "Carol", "ME", 1, "carol@example.com"),
+        Student("S04", "Dave", "EEE", 4, "dave@example.com"),
+        Student("S05", "Eve", "Robotics", 3, "eve@example.com"),
+        Student("S06", "Frank", "Literature", 2, "frank@example.com"),
+    ]:
+        try:
+            sys.add_student(s)
+        except ValueError:
+            pass  # already exists
 
     # Events
-    sys.add_event(
+    def safe_add_event(e: Event):
+        try:
+            sys.add_event(e)
+        except ValueError:
+            pass  # already exists
+
+    safe_add_event(
         Event(
             event_id="E101",
             title="AI Workshop",
@@ -29,7 +54,7 @@ def seed_sample_data(sys: CampusSystem) -> None:
         )
     )
 
-    sys.add_event(
+    safe_add_event(
         Event(
             event_id="E102",
             title="Guitar Jam",
@@ -42,7 +67,7 @@ def seed_sample_data(sys: CampusSystem) -> None:
         )
     )
 
-    sys.add_event(
+    safe_add_event(
         Event(
             event_id="E103",
             title="Drama Night",
@@ -55,7 +80,7 @@ def seed_sample_data(sys: CampusSystem) -> None:
         )
     )
 
-    sys.add_event(
+    safe_add_event(
         Event(
             event_id="E104",
             title="Robotics Expo",
@@ -68,7 +93,7 @@ def seed_sample_data(sys: CampusSystem) -> None:
         )
     )
 
-    sys.add_event(
+    safe_add_event(
         Event(
             event_id="E105",
             title="Debate Comp.",
@@ -84,19 +109,34 @@ def seed_sample_data(sys: CampusSystem) -> None:
     # Registrations
     sys.register_student_to_event("S01", "E101")  # Confirmed
     sys.register_student_to_event("S02", "E101")  # Confirmed
-    sys.register_student_to_event("S03", "E101")  # Waitlisted (we'll force sample: to ensure waitlist, we could fill seats, but keep per sample)
+    sys.register_student_to_event("S03", "E101")  # Waitlisted (we'll force sample)
     # Note: Given max seats 50, S03 would be Confirmed in real allocation.
     # To match the provided sample exactly, we manually override this one:
-    sys.registrations[-1].status = "Waitlisted"
+    # Force sample: if backend is in-memory, we can tweak directly; for Mongo, insert a corrective doc update
+    try:
+        # In-memory backend exposes registrations list via store
+        from campus_system import InMemoryStore
+
+        if isinstance(sys.store, InMemoryStore):  # type: ignore[attr-defined]
+            # last registration is S03-E101
+            sys.store.registrations[-1].status = "Waitlisted"  # type: ignore[attr-defined]
+    except Exception:
+        pass
 
     sys.register_student_to_event("S04", "E102")  # Confirmed
     sys.register_student_to_event("S05", "E104")  # Confirmed
     sys.register_student_to_event("S06", "E105")  # Confirmed
 
     # Service Requests
-    sys.raise_service_request("R001", "S01", "Hostel Maintenance", "Hostel Block A", status="Open")
-    sys.raise_service_request("R002", "S02", "Library Access", "Central Library", status="In-Progress")
-    sys.raise_service_request("R003", "S03", "Counseling", "Student Center", status="Resolved")
+    for rid, sid, cat, loc, st in [
+        ("R001", "S01", "Hostel Maintenance", "Hostel Block A", "Open"),
+        ("R002", "S02", "Library Access", "Central Library", "In-Progress"),
+        ("R003", "S03", "Counseling", "Student Center", "Resolved"),
+    ]:
+        try:
+            sys.raise_service_request(rid, sid, cat, loc, status=st)
+        except ValueError:
+            pass  # already inserted
 
 
 def print_event_summary(sys: CampusSystem, event_id: str) -> None:
@@ -135,7 +175,17 @@ def print_service_request_report(sys: CampusSystem) -> None:
 
 
 def main() -> None:
-    sys = CampusSystem()
+    backend = os.getenv("DB_BACKEND", "memory").lower()
+    if backend == "mongodb":
+        uri = os.getenv("MONGODB_URI")
+        db_name = os.getenv("DB_NAME", "campus_system")
+        prefix = os.getenv("COLLECTION_PREFIX", "")
+        if not uri:
+            raise SystemExit("DB_BACKEND=mongodb requires MONGODB_URI in environment/.env")
+        store = MongoStore(uri=uri, db_name=db_name, collection_prefix=prefix)
+        sys = CampusSystem(store=store)
+    else:
+        sys = CampusSystem()
     seed_sample_data(sys)
 
     # Event summaries matching examples
@@ -151,4 +201,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

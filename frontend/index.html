@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Campus Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">Campus Manager</div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="events">Events</button>
+        <button class="tab" data-tab="conflicts">Conflicts</button>
+        <button class="tab" data-tab="requests">Service Requests</button>
+      </nav>
+    </header>
+
+    <main class="container">
+      <!-- Events Panel -->
+      <section id="panel-events" class="panel show">
+        <div class="grid">
+          <div class="card">
+            <h2>Event Board</h2>
+            <div id="event-list" class="list"></div>
+          </div>
+          <div class="card">
+            <h2>Add Event</h2>
+            <form id="form-event" class="form">
+              <div class="row">
+                <input type="text" name="event_id" placeholder="Event ID (E###)" required />
+                <input type="text" name="title" placeholder="Title" required />
+              </div>
+              <div class="row">
+                <input type="text" name="organizer" placeholder="Organizer" required />
+                <input type="text" name="venue" placeholder="Venue" required />
+              </div>
+              <div class="row">
+                <input type="date" name="date" required />
+                <input type="time" name="start_time" required />
+                <input type="time" name="end_time" required />
+              </div>
+              <div class="row">
+                <input type="number" name="max_seats" placeholder="Max Seats" min="0" required />
+              </div>
+              <button type="submit" class="btn primary">Create Event</button>
+              <div class="note" id="event-note"></div>
+            </form>
+          </div>
+          <div class="card">
+            <h2>Register Student</h2>
+            <form id="form-register" class="form">
+              <div class="row">
+                <input type="text" name="student_id" placeholder="Student ID (S##)" required />
+                <input type="text" name="name" placeholder="Name" />
+              </div>
+              <div class="row">
+                <input type="text" name="dept" placeholder="Dept" />
+                <input type="number" name="year" placeholder="Year" min="1" max="5" />
+              </div>
+              <div class="row">
+                <input type="text" name="contact" placeholder="Contact" />
+              </div>
+              <div class="row">
+                <input type="text" name="event_id" placeholder="Event ID" required />
+              </div>
+              <button type="submit" class="btn secondary">Register</button>
+              <div class="note" id="register-note"></div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <!-- Conflicts Panel -->
+      <section id="panel-conflicts" class="panel">
+        <div class="card">
+          <h2>Conflict Report</h2>
+          <div id="conflict-list" class="list"></div>
+        </div>
+      </section>
+
+      <!-- Service Requests Panel -->
+      <section id="panel-requests" class="panel">
+        <div class="grid">
+          <div class="card">
+            <h2>Status Summary</h2>
+            <div id="request-summary" class="summary"></div>
+          </div>
+          <div class="card">
+            <h2>Raise Request</h2>
+            <form id="form-request" class="form">
+              <div class="row">
+                <input type="text" name="request_id" placeholder="Request ID (R###)" required />
+                <input type="text" name="student_id" placeholder="Student ID" required />
+              </div>
+              <div class="row">
+                <input type="text" name="category" placeholder="Category" required />
+                <input type="text" name="location" placeholder="Location" required />
+              </div>
+              <div class="row">
+                <input type="text" name="description" placeholder="Description (optional)" />
+              </div>
+              <button type="submit" class="btn primary">Submit</button>
+              <div class="note" id="request-note"></div>
+            </form>
+          </div>
+          <div class="card">
+            <h2>Update Request Status</h2>
+            <form id="form-request-status" class="form">
+              <div class="row">
+                <input type="text" name="request_id" placeholder="Request ID" required />
+                <select name="status" required>
+                  <option value="In-Progress">In-Progress</option>
+                  <option value="Resolved">Resolved</option>
+                </select>
+              </div>
+              <button type="submit" class="btn secondary">Update</button>
+              <div class="note" id="request-status-note"></div>
+            </form>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">© Campus Manager</footer>
+
+    <script src="/app.js"></script>
+  </body>
+  </html>
+
