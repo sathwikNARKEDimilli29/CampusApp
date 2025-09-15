@@ -43,6 +43,75 @@ Small, documented Python module and demo for managing campus events, student reg
 2. Ensure `DB_BACKEND=memory` in `.env` (default)
 3. Run: `pytest -q`
 
+## Comprehensive Execution Guide
+
+Follow these steps end-to-end to run everything locally and validate functionality.
+
+1) Prerequisites
+- Python 3.10+ installed and on PATH
+- Optional: MongoDB Atlas account (only if using the Mongo backend)
+
+2) Get the Code
+- Clone or download this repository into a local folder.
+
+3) Create a Virtual Environment
+- Windows (PowerShell): `python -m venv .venv; .\.venv\Scripts\Activate.ps1`
+- macOS/Linux: `python3 -m venv .venv && source .venv/bin/activate`
+
+4) Install Dependencies
+- `pip install -r requirements.txt`
+
+5) Configure Environment (.env)
+- The repo includes a `.env` template already. Open `.env` and choose a backend:
+  - In-memory (default):
+    - `DB_BACKEND=memory`
+  - MongoDB Atlas:
+    - `DB_BACKEND=mongodb`
+    - `MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster-url>/?retryWrites=true&w=majority&appName=<app>`
+    - `DB_NAME=campus_system` (optional)
+    - `COLLECTION_PREFIX=dev_` (optional)
+
+6) Run the Console Demo (optional)
+- Shows example outputs in the terminal using the selected backend.
+- `python demo.py`
+
+7) Run the Web Server + Frontend
+- Start the API and static frontend:
+- `uvicorn server:app --reload`
+- Open the UI at `http://127.0.0.1:8000`
+- API docs are at `http://127.0.0.1:8000/docs`
+
+8) Seed Mock Data (via API)
+- Use the built-in endpoint to populate mock students, events (with a conflict), registrations (including a waitlist), and requests.
+- cURL:
+  - `curl -X POST http://127.0.0.1:8000/api/mock/seed`
+- After seeding, refresh the UI tabs (Events, Conflicts, Service Requests) to verify data.
+
+9) Verify Schema Alignment (via API)
+- Compare the current implementation to the provided target schema.
+- `curl http://127.0.0.1:8000/api/schema/verify`
+- The response shows per-entity coverage (yes/partial/no), mapped field names, and any missing fields.
+
+10) Switch to MongoDB Atlas (optional)
+- In Atlas: create a cluster, database user, and network allowance for your IP.
+- Copy the connection string and set in `.env`:
+  - `DB_BACKEND=mongodb`
+  - `MONGODB_URI=...`
+  - `DB_NAME=campus_system` (optional)
+  - `COLLECTION_PREFIX=dev_` (optional)
+- Reinstall deps if needed: `pip install -r requirements.txt`
+- Start the server again: `uvicorn server:app --reload`
+- Note: the Mongo backend auto-creates indexes for IDs, conflict queries, and registration counts.
+
+11) Run the Test Suite
+- `pytest -q`
+- Tests cover: event conflicts and summaries, seat allocation + waitlist, service request status transitions and report, and duplicate handling.
+
+Troubleshooting
+- Import errors: ensure your virtual environment is active and dependencies installed.
+- Port in use: add `--port 8001` to the uvicorn command.
+- Mongo connection failures: verify `MONGODB_URI`, IP access list, and user credentials in Atlas.
+
 You should see event summaries, a conflict report, and service request counts printed to stdout.
 
 ## Environment Variables
