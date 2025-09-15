@@ -232,10 +232,190 @@ def request_report():
     return sys.service_request_report()
 
 
+# ---------- Mock Data and Schema Verification ----------
+
+
+def _seed_dataset(s: CampusSystem) -> dict:
+    """Seed deterministic mock data based on the app's schema.
+
+    Returns counts of inserted resources. Existing IDs are ignored.
+    """
+    added = {"students": 0, "events": 0, "registrations": 0, "requests": 0}
+
+    def add_student_safe(st: Student):
+        nonlocal added
+        try:
+            s.add_student(st)
+            added["students"] += 1
+        except ValueError:
+            pass
+
+    def add_event_safe(ev: Event):
+        nonlocal added
+        try:
+            s.add_event(ev)
+            added["events"] += 1
+        except ValueError:
+            pass
+
+    # Students
+    for st in [
+        Student("S01", "Alice Johnson", "CSE", 3, "alice@example.com"),
+        Student("S02", "Bob Smith", "ECE", 2, "bob@example.com"),
+        Student("S03", "Carol Lee", "ME", 1, "carol@example.com"),
+        Student("S04", "David Kim", "EEE", 4, "david@example.com"),
+        Student("S05", "Eve Patel", "Robotics", 3, "eve@example.com"),
+        Student("S06", "Frank Liu", "Literature", 2, "frank@example.com"),
+        Student("S07", "Grace Chen", "CSE", 1, "grace@example.com"),
+        Student("S08", "Henry Park", "CIV", 3, "henry@example.com"),
+        Student("S09", "Ivy Rao", "CSE", 2, "ivy@example.com"),
+        Student("S10", "Jack Wang", "IT", 4, "jack@example.com"),
+    ]:
+        add_student_safe(st)
+
+    # Events (includes an intentional overlap at Seminar Hall)
+    add_event_safe(Event("E101", "AI Workshop", "AI Club", parse_date("2025-09-20"), parse_time("10:00"), parse_time("12:00"), "Seminar Hall", 50))
+    add_event_safe(Event("E102", "Guitar Jam", "Music Club", parse_date("2025-09-20"), parse_time("11:00"), parse_time("12:30"), "Seminar Hall", 30))
+    add_event_safe(Event("E103", "Drama Night", "Drama Club", parse_date("2025-09-22"), parse_time("18:00"), parse_time("20:00"), "Auditorium", 100))
+    add_event_safe(Event("E104", "Robotics Expo", "Robotics Club", parse_date("2025-09-23"), parse_time("14:00"), parse_time("17:00"), "Lab Block", 40))
+    add_event_safe(Event("E105", "Debate Comp.", "Literary Club", parse_date("2025-09-24"), parse_time("15:00"), parse_time("17:00"), "Seminar Hall", 60))
+    # Tiny capacity to demonstrate waitlist
+    add_event_safe(Event("E201", "Tiny Session", "Test Org", parse_date("2025-09-25"), parse_time("09:00"), parse_time("10:00"), "Room 101", 1))
+
+    # Registrations (E201 should waitlist second registrant)
+    for sid, eid in [("S01", "E101"), ("S02", "E101"), ("S03", "E101"), ("S04", "E102"), ("S05", "E104"), ("S06", "E105"), ("S07", "E201"), ("S08", "E201")]:
+        try:
+            reg = s.register_student_to_event(sid, eid)
+            added["registrations"] += 1
+        except Exception:
+            pass
+
+    # Service requests
+    for rid, sid, cat, loc, st in [
+        ("R001", "S01", "Hostel Maintenance", "Hostel Block A", "Open"),
+        ("R002", "S02", "Library Access", "Central Library", "In-Progress"),
+        ("R003", "S03", "Counseling", "Student Center", "Resolved"),
+    ]:
+        try:
+            s.raise_service_request(rid, sid, cat, loc, status=st)
+            added["requests"] += 1
+        except Exception:
+            pass
+
+    return added
+
+
+@app.post("/api/mock/seed")
+def seed_mock_data():
+    counts = _seed_dataset(sys)
+    # Also return quick summaries to visually verify
+    summaries = [sys.event_summary(e.event_id) for e in sys.store.list_events()]
+    return {"inserted": counts, "events": summaries, "conflicts": sys.conflict_report(), "requests": sys.service_request_report()}
+
+
+@app.get("/api/schema/verify")
+def verify_schema():
+    """Compare the application's data model to the provided target schema.
+
+    Returns a structured report per entity with status: yes | partial | no,
+    and lists of matched fields, missing fields, and notes.
+    """
+    from dataclasses import fields as dc_fields
+    import campus_system as cs
+
+    report = {}
+
+    def compare(entity_name: str, model_cls, expected_fields: set, mappings: dict = None, notes: list = None):
+        nonlocal report
+        mappings = mappings or {}
+        notes = notes or []
+        actual = {f.name for f in dc_fields(model_cls)}
+        mapped_actual = set(actual)
+        # Apply simple name mappings (e.g., full_name -> name)
+        for target, ours in mappings.items():
+            if ours in actual:
+                mapped_actual.add(target)
+
+        missing = sorted(list(expected_fields - mapped_actual))
+        extra = sorted(list(actual - set(mappings.values()) - expected_fields))
+
+        status = "yes" if not missing else ("partial" if len(missing) < len(expected_fields) else "no")
+        report[entity_name] = {
+            "status": status,
+            "present_fields": sorted(list(actual)),
+            "mapped_fields": mappings,
+            "missing_fields": missing,
+            "extra_fields": extra,
+            "notes": notes,
+        }
+
+    # Target schema expectations per entity
+    compare(
+        "Student",
+        cs.Student,
+        expected_fields={"student_id", "full_name", "email", "dept", "year_of_study", "created_at"},
+        mappings={"full_name": "name", "email": "contact", "year_of_study": "year"},
+        notes=["created_at not tracked in current model"],
+    )
+
+    compare(
+        "Event",
+        cs.Event,
+        expected_fields={"event_id", "title", "club_id", "event_date", "start_time", "end_time", "venue_id", "max_seats", "created_at"},
+        mappings={"event_date": "date"},
+        notes=[
+            "Organizer is a free-text string, not a Club foreign key",
+            "Venue is a free-text string, not a Venue foreign key",
+            "Scheduling uniqueness enforced logically (first event valid), not DB UNIQUE",
+            "created_at not stored on Event in current model",
+        ],
+    )
+
+    compare(
+        "Registration",
+        cs.Registration,
+        expected_fields={"registration_id", "student_id", "event_id", "status", "waitlist_position", "registered_at"},
+        mappings={},
+        notes=[
+            "No registration_id or registered_at stored",
+            "Status supports Confirmed/Waitlisted only (no Cancelled)",
+            "No waitlist_position tracking",
+            "UNIQUE(student_id,event_id) enforced only in Mongo backend",
+        ],
+    )
+
+    compare(
+        "ServiceRequest",
+        cs.ServiceRequest,
+        expected_fields={"request_id", "student_id", "category", "location_text", "description", "status", "created_at", "updated_at"},
+        mappings={"location_text": "location"},
+        notes=[
+            "Status values: Open | In-Progress | Resolved (naming differs from target: InProgress)",
+            "updated_at not tracked",
+            "Category is free-text; target suggests fixed set",
+        ],
+    )
+
+    # Relationships summary
+    relationships = {
+        "Student->Registration": "yes",
+        "Event->Registration": "yes",
+        "Club->Event": "no (Organizer is free-text)",
+        "Venue->Event": "no (Venue is free-text)",
+        "Student->ServiceRequest": "yes",
+    }
+
+    overall = "partial"
+    if all(v == "yes" for v in [report["Student"]["status"], report["Event"]["status"], report["Registration"]["status"], report["ServiceRequest"]["status"]]):
+        overall = "yes"
+    if all(v == "no" for v in [report["Student"]["status"], report["Event"]["status"], report["Registration"]["status"], report["ServiceRequest"]["status"]]):
+        overall = "no"
+
+    return {"overall": overall, "entities": report, "relationships": relationships}
+
 # Serve the frontend
 app.mount(
     "/",
     StaticFiles(directory="frontend", html=True),
     name="frontend",
 )
-
